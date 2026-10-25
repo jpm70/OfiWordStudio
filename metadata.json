@@ -1,6 +1,0 @@
-{
-  "name": "OfiWord Studio — Generador de Casos Prácticos de Microsoft Word",
-  "description": "Generador interactivo de casos prácticos, textos base y rúbricas de evaluación de Microsoft Word para estudiantes y docentes de ofimática.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
