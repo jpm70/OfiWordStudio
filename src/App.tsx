@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Copy,
@@ -41,521 +36,65 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-export type NivelPractica = 'Iniciación' | 'Intermedio' | 'Avanzado';
-
-export type EscenarioDocumento =
-  | 'Circular interna corporativa'
-  | 'Informe técnico'
-  | 'Manual de procedimientos'
-  | 'Carta formal comercial'
-  | ' Acta de reunión ejecutiva'
-  | 'Pliego de prescripciones técnicas';
-
-export type ModuloOpcional =
-  | 'Tablas'
-  | 'Estilos'
-  | 'Tabulaciones'
-  | 'Columnas'
-  | 'Portada'
-  | 'Encabezados y Pies'
-  | 'Tabla de Contenido'
-  | 'Combinación de Correspondencia';
-
-export interface RequisitoTecnico {
-  categoria: string;
-  accion_requerida: string;
-  ruta_cinta_opciones: string;
-  atajo_teclado?: string;
-  error_frecuente?: string;
-  puntos: number;
-}
-
-export interface CasoPractico {
-  id: string;
-  fecha_creacion: string;
-  nivel: NivelPractica;
-  escenario: string;
-  modulos: ModuloOpcional[];
-  tiempo_estimado_min?: number;
-  titulo_practica: string;
-  escenario_laboral: string;
-  texto_sin_formato: string;
-  requisitos_tecnicos: RequisitoTecnico[];
-  criterio_evaluacion_final: string;
-}
+import {
+  CasoInvalidoError,
+  ESCENARIOS,
+  MODULOS_DISPONIBLES,
+  normalizarCaso,
+  slugArchivo,
+  type CasoPractico,
+  type ModuloOpcional,
+  type NivelPractica,
+} from './lib/caso.ts';
+import { ErrorGemini, generarCaso } from './lib/gemini.ts';
+import { construirMaqueta } from './lib/maqueta.ts';
+import {
+  ATAJOS_REFERENCIA,
+  CASOS_PREDEFINIDOS,
+  NIVELES,
+  REGLAS_ORO_PREENTREGA,
+} from './data.ts';
+// Incrustado (data URI): sirve igual en Pages, en la versión offline y en el PDF.
+import logoUrl from './assets/icono.png?inline';
 
 const API_KEY_STORAGE = 'gemini_api_key';
 const STORAGE_HISTORIAL_KEY = 'ofiword_practicas_historial_v2';
 const STORAGE_PROGRESO_KEY = 'ofiword_progreso_requisitos_v2';
-const LOGO_PATH = './assets/aistudio/icono_81a3db5b.png';
+const STORAGE_CASO_ACTIVO_KEY = 'ofiword_caso_activo';
+const STORAGE_TEMA_KEY = 'ofiword_tema';
+const LOGO_PATH = logoUrl;
 const AUTHOR_WEB_URL = 'https://www.unfantasmaenelsistema.com/';
+const REPO_URL = 'https://github.com/unfantasmaenelsistema/OfiWordStudio';
+const OFFLINE_FILE = 'ofiword-studio.html';
+const MAX_CASOS_PROPIOS = 30;
+const MAX_BYTES_IMPORTACION = 1024 * 1024;
 
-const NIVELES: {
-  id: NivelPractica;
-  resumen: string;
-  competencias: string;
-  tiempoSugerido: number;
-}[] = [
-  {
-    id: 'Iniciación',
-    resumen: 'Formato base de fuente y párrafo',
-    competencias: 'Fuentes, alineación, interlineado, sangrías, bordes y viñetas.',
-    tiempoSugerido: 20,
-  },
-  {
-    id: 'Intermedio',
-    resumen: 'Maquetación y estructuras tabulares',
-    competencias:
-      'Tablas complejas, tabulaciones con relleno, columnas y saltos de página/sección.',
-    tiempoSugerido: 30,
-  },
-  {
-    id: 'Avanzado',
-    resumen: 'Automatización y documentos extensos',
-    competencias:
-      'Estilos jerárquicos, tabla de contenido automática, encabezados desvinculados y correspondencia.',
-    tiempoSugerido: 45,
-  },
-];
-
-const ESCENARIOS: string[] = [
-  'Circular interna corporativa',
-  'Informe técnico',
-  'Manual de procedimientos',
-  'Carta formal comercial',
-  'Acta de reunión ejecutiva',
-  'Pliego de prescripciones técnicas',
-];
-
-const MODULOS_DISPONIBLES: ModuloOpcional[] = [
-  'Tablas',
-  'Estilos',
-  'Tabulaciones',
-  'Columnas',
-  'Portada',
-  'Encabezados y Pies',
-  'Tabla de Contenido',
-  'Combinación de Correspondencia',
-];
-
-const ATAJOS_REFERENCIA = [
-  { accion: 'Negrita / Cursiva / Subrayado', atajo: 'Ctrl + N / Ctrl + K / Ctrl + S', categoria: 'Fuente' },
-  { accion: 'Abrir cuadro de diálogo Fuente', atajo: 'Ctrl + M', categoria: 'Fuente' },
-  { accion: 'Alinear Izquierda / Centro / Derecha / Justificar', atajo: 'Ctrl + Q / T / D / J', categoria: 'Párrafo' },
-  { accion: 'Mostrar u ocultar marcas de formato (¶)', atajo: 'Ctrl + Mayús + 8', categoria: 'Vista' },
-  { accion: 'Insertar salto de página manual', atajo: 'Ctrl + Entrar', categoria: 'Paginación' },
-  { accion: 'Insertar salto de línea sin cambiar de párrafo', atajo: 'Mayús + Entrar', categoria: 'Párrafo' },
-  { accion: 'Aplicar estilo Título 1 / Título 2 / Normal', atajo: 'Alt + Ctrl + 1 / 2 / N', categoria: 'Estilos' },
-  { accion: 'Actualizar campos (Tabla de contenido / referencias)', atajo: 'F9', categoria: 'Referencias' },
-  { accion: 'Copiar formato de texto/párrafo', atajo: 'Ctrl + Mayús + C / V', categoria: 'Portapapeles' },
-  { accion: 'Buscar y reemplazar texto o formatos especiales', atajo: 'Ctrl + L', categoria: 'Edición' },
-];
-
-const REGLAS_ORO_PREENTREGA = [
-  {
-    id: 'regla-1',
-    titulo: 'Cero saltos con Intro vacíos (¶)',
-    detalle: 'He separado los párrafos usando "Espaciado anterior/posterior" y nunca pulsando Intro dos veces seguidas.',
-  },
-  {
-    id: 'regla-2',
-    titulo: 'Cero alineación con barra espaciadora',
-    detalle: 'He utilizado sangrías, alineaciones o paradas de tabulación en la regla en lugar de espacios repetidos.',
-  },
-  {
-    id: 'regla-3',
-    titulo: 'Estilos vinculados en epígrafes',
-    detalle: 'Todos los títulos utilizan estilos (Título 1, Título 2) para que el panel de navegación y el índice funcionen.',
-  },
-  {
-    id: 'regla-4',
-    titulo: 'Saltos limpios de página o sección',
-    detalle: 'Los cambios de estructura (columnas, orientación o encabezados distintos) usan Saltos de Sección adecuados.',
-  },
-];
-
-const CASOS_PREDEFINIDOS: CasoPractico[] = [
-  {
-    id: 'preset-intermedio-informe',
-    fecha_creacion: 'Caso oficial · Intermedio',
-    nivel: 'Intermedio',
-    escenario: 'Informe técnico',
-    modulos: ['Tablas', 'Estilos', 'Tabulaciones', 'Columnas', 'Encabezados y Pies'],
-    tiempo_estimado_min: 30,
-    titulo_practica:
-      'Informe Técnico de Auditoría Energética y Climatización — Sede Corporativa Norte',
-    escenario_laboral:
-      'Trabajas como técnico documental en el Departamento de Infraestructuras de Grupo Iberia Sostenible S.A. La dirección de ingeniería te ha entregado el borrador sin formato de la auditoría trimestral de consumo eléctrico y climatización. Tu objetivo es maquetar el documento siguiendo la normativa visual de la empresa antes de su presentación ante el Comité de Dirección.',
-    texto_sin_formato: `INFORME TÉCNICO DE AUDITORÍA ENERGÉTICA Y CLIMATIZACIÓN - SEDE CORPORATIVA NORTE
-
-1. RESUMEN EJECUTIVO DE LA INTERVENCIÓN
-Durante el tercer trimestre del ejercicio actual se ha llevado a cabo la revisión integral de los sistemas de climatización HVAC y los cuadros de distribución lumínica en las cuatro plantas del edificio principal. Las mediciones termográficas revelan oportunidades inmediatas de optimización en los cerramientos de la fachada norte y en la programación horaria de las enfriadoras de cubierta. La adopción de las medidas correctoras detalladas en este documento permitirá reducir la demanda térmica anual en un 18,4 % sin comprometer el confort ambiental de los puestos de trabajo.
-
-2. ANÁLISIS TÉCNICO POR ZONAS OPERATIVAS
-Planta Baja y Recepción Logística: El tránsito continuo en las puertas de acceso genera infiltraciones de aire exterior no tratado. Se recomienda instalar cortinas de aire de alta eficiencia acopladas a sensores de apertura magnética. Área de Servidores y Comunicaciones (Planta 1): Los equipos de refrigeración de precisión mantienen una temperatura constante de 19 °C, pero presentan un diferencial de presión elevado en los filtros de impulsión que incrementa el consumo específico de los ventiladores. Plantas de Oficinas Generales (Plantas 2 y 3): La sustitución de luminarias fluorescentes convencionales por paneles LED con regulación DALI por aporte de luz natural ha completado su fase piloto con resultados superiores a los previstos inicialmente.
-
-3. CUADRO DE MEDICIONES Y CONSUMOS POR PLANTA (CONVERTIR EN TABLA)
-Planta - Superficie (m2) - Consumo Actual (kWh/mes) - Ahorro Estimado (%) - Prioridad de Actuación
-Planta Baja (Acceso y Logística) - 850 - 6420 - 14,5 % - Alta
-Planta 1 (CPD y Laboratorio) - 620 - 11850 - 22,0 % - Crítica
-Planta 2 (Administración y Finanzas) - 1100 - 4980 - 16,2 % - Media
-Planta 3 (Dirección y Operaciones) - 1100 - 4710 - 19,8 % - Media
-
-4. ÍNDICE DE EQUIPOS REVISADOS Y RESPONSABLES TÉCNICOS (APLICAR TABULACIONES CON RELLENO)
-Unidad Enfriadora RoofTop Carrier 40kW ... Ing. Marta Salazar ... Revisión Completada
-Cuadro General de Baja Tensión CGBT-01 ... Téc. Roberto Méndez ... Pendiente Equilibrado
-Sistema de Ventilación Mecánica Recuperadora ... Ing. Elena Valbuena ... Revisión Completada
-Batería de Condensadores Automática 120 kVAr ... Téc. Roberto Méndez ... Sustitución Programada
-
-5. CONCLUSIONES Y PLAN DE IMPLANTACIÓN
-La ejecución escalonada del plan de mejora comenzará el próximo mes con la intervención prioritaria sobre el Centro de Procesamiento de Datos en la Planta 1. Todas las actuaciones deberán registrarse en el libro de mantenimiento preventivo y validarse mediante una segunda medición de contraste transcurridos sesenta días naturales desde la puesta en marcha.`,
-    requisitos_tecnicos: [
-      {
-        categoria: 'Diseño de Página',
-        accion_requerida:
-          'Configura el tamaño de papel en A4 con orientación vertical y márgenes personalizados: Superior e Inferior de 2,5 cm; Izquierdo de 3,0 cm y Derecho de 2,5 cm.',
-        ruta_cinta_opciones:
-          'Disposición > Configurar página > Márgenes > Márgenes personalizados',
-        atajo_teclado: 'Alt + P, M, A',
-        error_frecuente: 'No modifiques los márgenes arrastrando la sangría de la regla horizontal.',
-        puntos: 10,
-      },
-      {
-        categoria: 'Estilos',
-        accion_requerida:
-          'Modifica el estilo "Título 1" para los epígrafes numerados (1 al 5) con fuente Aptos Display o Calibri Light de 14 pt, negrita, color Azul énfasis 1 oscuro 25%, espaciado anterior de 12 pt y posterior de 6 pt.',
-        ruta_cinta_opciones:
-          'Inicio > Estilos > Clic derecho en Título 1 > Modificar > Formato > Párrafo',
-        atajo_teclado: 'Alt + Ctrl + 1',
-        error_frecuente: 'No apliques el formato manualmente título por título; modifica el estilo para que todos cambien a la vez.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Formato de Párrafo',
-        accion_requerida:
-          'Aplica al cuerpo del texto alineación Justificada, interlineado Múltiple en 1,15 líneas, sangría especial de primera línea de 1,25 cm y espaciado posterior de 6 pt.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Configuración de párrafo > Sangría y espacio',
-        atajo_teclado: 'Ctrl + J (Justificar)',
-        error_frecuente: 'Evita usar la tecla Tabulador al principio de cada párrafo; configúralo en Sangría especial: Primera línea.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Columnas',
-        accion_requerida:
-          'Selecciona exclusivamente el texto descriptivo del apartado "2. ANÁLISIS TÉCNICO POR ZONAS OPERATIVAS" y divídelo en 2 columnas iguales con separación de 1,0 cm y línea entre columnas.',
-        ruta_cinta_opciones:
-          'Disposición > Configurar página > Columnas > Más columnas > Dos (marcar Línea entre columnas)',
-        atajo_teclado: 'Alt + P, J, C',
-        error_frecuente: 'Selecciona solo el párrafo sin incluir el título ni saltos extra para que Word cree saltos de sección Continuos automáticamente.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Tablas',
-        accion_requerida:
-          'Convierte los datos del apartado 3 (separados por guiones) en una tabla de 5 columnas y 5 filas. Aplica autoajuste al contenido, fila de encabezado con sombreado azul corporativo y texto blanco, y alinea a la derecha los valores numéricos.',
-        ruta_cinta_opciones:
-          'Insertar > Tablas > Tabla > Convertir texto en tabla > Separar texto en: Otro ( - )',
-        atajo_teclado: 'Alt + B, T, V',
-        error_frecuente: 'No crees la tabla vacía para copiar celda por celda; usa la herramienta "Convertir texto en tabla".',
-        puntos: 20,
-      },
-      {
-        categoria: 'Tabulaciones',
-        accion_requerida:
-          'En la lista del apartado 4, reemplaza los puntos escritos manualmente por una única pulsación de la tecla Tab y fija dos paradas: centrada en 9,0 cm con relleno tipo 2 (...) y derecha en 15,5 cm con relleno tipo 2.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Configuración de párrafo > Botón Tabulaciones (esquina inferior izquierda)',
-        atajo_teclado: 'Tecla Tab',
-        error_frecuente: 'Nunca escribas puntos suspensivos "..." a mano; el carácter de relleno se genera automáticamente al pulsar Tab.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Saltos y Encabezado',
-        accion_requerida:
-          'Inserta un salto de página antes del apartado 3 y añade un pie de página con "Auditoría Energética Interna" a la izquierda y campo "Página X de Y" a la derecha.',
-        ruta_cinta_opciones:
-          'Insertar > Encabezado y pie de página > Pie de página / Ctrl + Entrar para salto',
-        atajo_teclado: 'Ctrl + Entrar',
-        error_frecuente: 'No escribas el número de página como texto fijo; inserta siempre el campo automático de Numeración de página.',
-        puntos: 10,
-      },
-    ],
-    criterio_evaluacion_final:
-      'El documento entregado (.docx) no debe contener espacios múltiples consecutivos ni líneas en blanco creadas con la tecla Intro para separar párrafos. Se verificará activando el comando Mostrar todo (¶) que los saltos de sección para las columnas, las marcas de tabulación y la tabla estén construidos de forma limpia.',
-  },
-  {
-    id: 'preset-iniciacion-circular',
-    fecha_creacion: 'Caso oficial · Iniciación',
-    nivel: 'Iniciación',
-    escenario: 'Circular interna corporativa',
-    modulos: ['Estilos', 'Encabezados y Pies'],
-    tiempo_estimado_min: 20,
-    titulo_practica:
-      'Circular Interna sobre Protocolo de Teletrabajo Híbrido y Seguridad Digital',
-    escenario_laboral:
-      'Formas parte del área de Recursos Humanos de Editorial Atlántida. Debes dar formato profesional a una circular interna dirigida a toda la plantilla sobre la actualización de los turnos de teletrabajo y el uso obligatorio de doble factor de autenticación.',
-    texto_sin_formato: `CIRCULAR INTERNA N.º 14/2026 - DIRECCIÓN DE PERSONAS Y CULTURA DIGITAL
-ASUNTO: ACTUALIZACIÓN DEL PROTOCOLO DE TRABAJO HÍBRIDO Y SEGURIDAD EN EQUIPOS PORTÁTILES
-
-Estimado equipo:
-
-A partir del próximo día 1 del mes entrante entrará en vigor la revisión anual del acuerdo de flexibilidad horaria y trabajo a distancia para todos los departamentos técnicos y administrativos de la compañía. Esta actualización responde al objetivo de armonizar la conciliación personal con las sesiones presenciales de coordinación interdepartamental.
-
-Condiciones generales de la modalidad híbrida para el presente trimestre:
-Jornada presencial mínima de tres días semanales en la sede asignada.
-Franja de disponibilidad sincrónica obligatoria entre las 09:30 h y las 14:00 h.
-Registro previo de los días de teletrabajo en el portal interno antes de cada viernes a las 13:00 h.
-Uso exclusivo del equipo portátil corporativo conectado mediante la red privada virtual (VPN) de la empresa.
-
-Asimismo, el Departamento de Sistemas informa de que todos los empleados deberán activar la verificación en dos pasos (2FA) en su cuenta corporativa antes de finalizar la presente semana. En caso de incidencia técnica durante la configuración, el servicio de soporte interior atenderá consultas en la extensión telefónica 4102.
-
-Agradecemos de antemano vuestra colaboración para mantener un entorno de trabajo seguro, ágil y coordinado.
-
-Atentamente,
-Dirección de Personas y Organización
-Editorial Atlántida S.L.`,
-    requisitos_tecnicos: [
-      {
-        categoria: 'Formato de Fuente',
-        accion_requerida:
-          'Selecciona todo el documento y establece la familia tipográfica Calibri de 11 pt para el texto general. Aplica al título principal tamaño 14 pt, negrita, efecto Versalitas y color Azul oscuro.',
-        ruta_cinta_opciones:
-          'Inicio > Fuente > Cuadro de diálogo Fuente (Ctrl + M) > Efectos: Versalitas',
-        atajo_teclado: 'Ctrl + E (Seleccionar todo) / Ctrl + M',
-        error_frecuente: 'Usa el efecto Versalitas desde el cuadro de diálogo Fuente en vez de solo cambiar el tamaño.',
-        puntos: 20,
-      },
-      {
-        categoria: 'Bordes y Sombreado',
-        accion_requerida:
-          'Aplica un borde inferior de 1,5 pt de grosor y sombreado Gris claro (fondo 2, oscuro 10%) al bloque de las dos primeras líneas de cabecera (Circular y Asunto).',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Bordes > Bordes y sombreado (Aplicar a: Párrafo)',
-        atajo_teclado: 'Alt + O, B, B',
-        error_frecuente: 'Asegúrate de que en "Aplicar a:" esté seleccionado "Párrafo" y no "Texto".',
-        puntos: 20,
-      },
-      {
-        categoria: 'Formato de Párrafo',
-        accion_requerida:
-          'Configura los párrafos explicativos con alineación Justificada, interlineado de 1,15 líneas y espaciado posterior de 8 pt.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Interlineado y opciones de interlineado',
-        atajo_teclado: 'Ctrl + J',
-        error_frecuente: 'Elimina las líneas vacías entre párrafos para que el espaciado de 8 pt controle la separación.',
-        puntos: 20,
-      },
-      {
-        categoria: 'Sangrías y Viñetas',
-        accion_requerida:
-          'Aplica una lista con viñetas cuadradas a las cuatro condiciones de la modalidad híbrida, con posición de viñeta en 1,0 cm y sangría de texto en 1,63 cm.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Viñetas > Clic derecho en la lista > Ajustar sangrías de lista',
-        atajo_teclado: 'Ctrl + Mayús + L',
-        error_frecuente: 'Ajusta las medidas exactas desde "Ajustar sangrías de lista", no moviendo los controles de la regla a ojo.',
-        puntos: 25,
-      },
-      {
-        categoria: 'Firma y Cierre',
-        accion_requerida:
-          'Alinea a la derecha las tres últimas líneas de despedida y firma, aplicando cursiva al nombre de la empresa "Editorial Atlántida S.L." y sangría derecha de 1,0 cm.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Alinear a la derecha (Ctrl + D) / Ctrl + K',
-        atajo_teclado: 'Ctrl + D / Ctrl + K',
-        error_frecuente: 'No uses tabuladores repetidos para llevar la firma a la derecha; usa alineación derecha.',
-        puntos: 15,
-      },
-    ],
-    criterio_evaluacion_final:
-      'Se revisará la uniformidad visual de la circular en una sola página A4, el uso de espaciado de párrafo automático en lugar de saltos manuales y la correcta alineación de la lista de viñetas.',
-  },
-  {
-    id: 'preset-avanzado-manual',
-    fecha_creacion: 'Caso oficial · Avanzado',
-    nivel: 'Avanzado',
-    escenario: 'Manual de procedimientos',
-    modulos: ['Portada', 'Estilos', 'Tablas', 'Tabla de Contenido', 'Encabezados y Pies'],
-    tiempo_estimado_min: 45,
-    titulo_practica:
-      'Manual Corporativo de Gestión de Calidad ISO 9001 y Control Documental',
-    escenario_laboral:
-      'Eres el responsable de Documentación y Procesos en Laboratorios BioNova. Para superar la auditoría externa ISO 9001, necesitas estructurar el Manual de Control Documental incluyendo portada integrada, estilos multinivel numerados, tabla de contenido automática y encabezados desvinculados entre secciones.',
-    texto_sin_formato: `MANUAL DE PROCEDIMIENTOS OPERATIVOS ESTÁNDAR (POE-CAL-08)
-SISTEMA DE GESTIÓN DE LA CALIDAD Y TRAZABILIDAD DOCUMENTAL
-
-CAPÍTULO 1. OBJETO Y ALCANCE DEL PROCEDIMIENTO
-1.1 Propósito del control documental
-El presente manual establece las directrices obligatorias para la elaboración, revisión, aprobación, distribución y archivo de toda la documentación técnica y de calidad generada en las instalaciones de Laboratorios BioNova. Su cumplimiento garantiza que el personal opere exclusivamente con las versiones vigentes autorizadas.
-1.2 Ámbito de aplicación
-Las disposiciones recogidas en este documento afectan a las áreas de Control Microbiológico, Garantía de Calidad, Producción Farmacéutica y Logística de Frío.
-
-CAPÍTULO 2. CODIFICACIÓN Y MATRIZ DE VIGENCIA
-2.1 Estructura del código alfanumérico
-Todo procedimiento interno se identificará mediante un código único compuesto por tres bloques separados por guiones: siglas del tipo documental, código de departamento de tres letras y número correlativo de dos dígitos.
-2.2 Matriz de control de revisiones vigentes (CONVERTIR EN TABLA)
-Código - Denominación del Procedimiento - Versión - Fecha Vigencia - Responsable
-POE-MIC-01 - Toma de muestras en sala limpia - v4.2 - 15/01/2026 - Dra. Carmen Vega
-POE-GAR-04 - Gestión de no conformidades y CAPA - v3.0 - 02/03/2026 - Ing. Javier Solís
-POE-LOG-09 - Validación de cadena de frío en transporte - v2.5 - 20/06/2026 - Lic. Andrés Pardo
-POE-PRO-12 - Limpieza y despeje de línea de envasado - v5.1 - 10/09/2026 - Dra. Sonia Beltrán
-
-CAPÍTULO 3. FLUJO DE APROBACIÓN Y ARCHIVO HISTÓRICO
-3.1 Custodia de ejemplares obsoletos
-Cuando se publique una nueva revisión de un procedimiento, el sistema documental retirará de inmediato el acceso de lectura a la versión anterior y almacenará una copia bloqueada con marca de agua "OBSOLETO - SOLO CONSULTA HISTÓRICA" durante un periodo legal de cinco años.`,
-    requisitos_tecnicos: [
-      {
-        categoria: 'Portada y Secciones',
-        accion_requerida:
-          'Inserta una portada prediseñada sobria (tipo "Con bandas" o "Integral") con el título del manual y divide el documento en 3 secciones independientes mediante saltos de sección (Página siguiente): Sección 1 (Portada), Sección 2 (Tabla de Contenido) y Sección 3 (Capítulos).',
-        ruta_cinta_opciones:
-          'Insertar > Páginas > Portada / Disposición > Configurar página > Saltos > Página siguiente',
-        atajo_teclado: 'Alt + P, S, P',
-        error_frecuente: 'Usa "Salto de sección (Página siguiente)" y no un salto de página normal para poder desvincular los encabezados.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Estilos y Lista Multinivel',
-        accion_requerida:
-          'Aplica "Título 1" a los CAPÍTULOS y "Título 2" a los subapartados (1.1, 1.2...). Vincula ambos estilos a una lista multinivel jerárquica y activa "Salto de página anterior" en el formato de párrafo del estilo Título 1.',
-        ruta_cinta_opciones:
-          'Inicio > Párrafo > Lista multinivel > Definir nueva lista multinivel > Más > Vincular nivel al estilo',
-        atajo_teclado: 'Alt + Ctrl + 1 / Alt + Ctrl + 2',
-        error_frecuente: 'Activa "Salto de página anterior" dentro de la pestaña "Líneas y saltos de página" al modificar el estilo Título 1.',
-        puntos: 20,
-      },
-      {
-        categoria: 'Tabla de Contenido',
-        accion_requerida:
-          'En la Sección 2, inserta una Tabla de Contenido automática que muestre 2 niveles jerárquicos con carácter de relleno de puntos y números de página alineados a la derecha.',
-        ruta_cinta_opciones:
-          'Referencias > Tabla de contenido > Tabla de contenido personalizada',
-        atajo_teclado: 'F9 (Actualizar tabla)',
-        error_frecuente: 'Nunca construyas el índice manualmente; debe actualizarse solo al pulsar F9.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Encabezados Desvinculados',
-        accion_requerida:
-          'Desactiva "Vincular al anterior" en los encabezados y pies de la Sección 3. En la Sección 2 usa numeración romana en minúsculas (i, ii) y en la Sección 3 reinicia la numeración arábiga en 1 incluyendo un campo StyleRef con el título del capítulo actual.',
-        ruta_cinta_opciones:
-          'Encabezado y pie de página > Navegación > Vincular al anterior / Elementos rápidos > Campo > StyleRef',
-        atajo_teclado: 'Alt + B, E',
-        error_frecuente: 'Si olvidas desactivar "Vincular al anterior" antes de borrar o cambiar el encabezado de la Sección 3, alterarás también la Sección 2.',
-        puntos: 20,
-      },
-      {
-        categoria: 'Tablas Avanzadas',
-        accion_requerida:
-          'Convierte la matriz del apartado 2.2 en tabla, activa "Repetir filas de título", establece un margen de celda superior e inferior de 0,15 cm y centra verticalmente el contenido de todas las celdas.',
-        ruta_cinta_opciones:
-          'Disposición de tabla > Datos > Repetir filas de título / Alineación > Márgenes de celda',
-        atajo_teclado: 'Alt + J, L, J',
-        error_frecuente: '"Repetir filas de título" solo funciona si seleccionas la primera fila de la tabla.',
-        puntos: 15,
-      },
-      {
-        categoria: 'Marca de Agua y Protección',
-        accion_requerida:
-          'Inserta una marca de agua de texto diagonal semitransparente con la leyenda "COPIA CONTROLADA ISO 9001" en gris suave en todo el documento.',
-        ruta_cinta_opciones:
-          'Diseño > Fondo de página > Marca de agua > Marca de agua personalizada',
-        atajo_teclado: 'Alt + G, M, M',
-        error_frecuente: 'Asegúrate de dejar marcada la casilla "Semitransparente" para no dificultar la lectura del texto.',
-        puntos: 15,
-      },
-    ],
-    criterio_evaluacion_final:
-      'Para superar la evaluación avanzada, la Tabla de Contenido debe actualizarse dinámicamente mediante F9 sin errores de referencia, las secciones deben poseer numeración independiente verificable y los estilos Título 1 y Título 2 deben controlar todo el formato jerárquico sin sobrecargas de formato manual directo.',
-  },
-];
-
-// Esquema JSON enriquecido para Gemini 2.5 Flash
-const GEMINI_RESPONSE_SCHEMA = {
-  type: 'OBJECT',
-  properties: {
-    titulo_practica: {
-      type: 'STRING',
-      description:
-        'Título profesional y descriptivo del caso práctico de Microsoft Word.',
-    },
-    tiempo_estimado_min: {
-      type: 'INTEGER',
-      description: 'Tiempo estimado de realización en minutos (entre 15 y 50).',
-    },
-    escenario_laboral: {
-      type: 'STRING',
-      description:
-        'Contexto realista del encargo en una empresa explicando el propósito del documento y el rol del alumno.',
-    },
-    texto_sin_formato: {
-      type: 'STRING',
-      description:
-        '4 o 5 párrafos extensos de texto continuo sin formato para que el alumno lo copie y pegue en Microsoft Word.',
-    },
-    requisitos_tecnicos: {
-      type: 'ARRAY',
-      description:
-        'Lista de requisitos técnicos evaluables cuya suma de puntos sea exactamente 100.',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          categoria: {
-            type: 'STRING',
-            description:
-              'Categoría técnica (ej. Formato de Fuente, Párrafo, Tablas, Estilos, Tabulaciones, Columnas, Portada, Encabezados).',
-          },
-          accion_requerida: {
-            type: 'STRING',
-            description:
-              'Instrucción técnica precisa con medidas en pt o cm que el estudiante debe aplicar en Word.',
-          },
-          ruta_cinta_opciones: {
-            type: 'STRING',
-            description:
-              'Ruta exacta en la Cinta de Opciones de Word en español (ej. Inicio > Párrafo > Sangría y espacio).',
-          },
-          atajo_teclado: {
-            type: 'STRING',
-            description:
-              'Atajo de teclado útil en Word en español para esta acción (ej. Ctrl + J, Ctrl + M, Ctrl + Entrar, F9).',
-          },
-          error_frecuente: {
-            type: 'STRING',
-            description:
-              'Error típico que el alumno debe evitar al realizar este paso en Word.',
-          },
-          puntos: {
-            type: 'INTEGER',
-            description: 'Puntos asignados a este requisito.',
-          },
-        },
-        required: [
-          'categoria',
-          'accion_requerida',
-          'ruta_cinta_opciones',
-          'atajo_teclado',
-          'error_frecuente',
-          'puntos',
-        ],
-      },
-    },
-    criterio_evaluacion_final: {
-      type: 'STRING',
-      description:
-        'Criterio global de evaluación final del documento .docx terminado.',
-    },
-  },
-  required: [
-    'titulo_practica',
-    'tiempo_estimado_min',
-    'escenario_laboral',
-    'texto_sin_formato',
-    'requisitos_tecnicos',
-    'criterio_evaluacion_final',
-  ],
-};
+// Lee los casos guardados validando cada uno: un registro corrupto o de una
+// versión anterior se descarta en vez de dejar la aplicación en blanco.
+function cargarCasosPropios(): CasoPractico[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_HISTORIAL_KEY) || '[]');
+    if (!Array.isArray(saved)) return [];
+    const casos: CasoPractico[] = [];
+    for (const item of saved) {
+      const id = typeof item?.id === 'string' ? item.id : '';
+      if (!id || id.startsWith('preset-')) continue;
+      try {
+        casos.push(
+          normalizarCaso(item, {
+            id,
+            fecha_creacion: typeof item.fecha_creacion === 'string' ? item.fecha_creacion : '',
+          })
+        );
+      } catch {
+        // Registro inválido: se ignora
+      }
+    }
+    return casos.slice(0, MAX_CASOS_PROPIOS);
+  } catch {
+    return [];
+  }
+}
 
 export default function App() {
   // 1. ARQUITECTURA BYOK (localStorage 'gemini_api_key')
@@ -577,14 +116,7 @@ export default function App() {
 
   const [mostrarKeyTexto, setMostrarKeyTexto] = useState<boolean>(false);
 
-  const [modalKeyAbierto, setModalKeyAbierto] = useState<boolean>(() => {
-    try {
-      const guardada = localStorage.getItem(API_KEY_STORAGE);
-      return !guardada || guardada.trim() === '';
-    } catch {
-      return true;
-    }
-  });
+  const [modalKeyAbierto, setModalKeyAbierto] = useState<boolean>(false);
 
   // Modal de Chuleta / Glosario Pedagógico
   const [modalGlosarioAbierto, setModalGlosarioAbierto] = useState<boolean>(false);
@@ -677,8 +209,41 @@ export default function App() {
     );
   };
 
-  // Tema Claro / Oscuro
-  const [darkMode, setDarkMode] = useState<boolean>(false);
+  // Tema Claro / Oscuro (recordado; por defecto, el del sistema)
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    try {
+      const guardado = localStorage.getItem(STORAGE_TEMA_KEY);
+      if (guardado) return guardado === 'oscuro';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
+
+  // Escape cierra la ventana abierta (la de la clave solo si ya hay una guardada,
+  // igual que su botón de cerrar).
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setModalGlosarioAbierto(false);
+      setModalInformeAbierto(false);
+      setModalKeyAbierto(false);
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, []);
+
+  useEffect(() => {
+    // Las utilidades `dark:` de Tailwind siguen a esta clase (ver index.css),
+    // no al tema del sistema operativo.
+    document.documentElement.classList.toggle('dark', darkMode);
+    document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light';
+    try {
+      localStorage.setItem(STORAGE_TEMA_KEY, darkMode ? 'oscuro' : 'claro');
+    } catch {
+      // Ignore
+    }
+  }, [darkMode]);
 
   // Estado del Formulario de Generación
   const [nivel, setNivel] = useState<NivelPractica>('Intermedio');
@@ -692,25 +257,19 @@ export default function App() {
   const [temaPersonalizado, setTemaPersonalizado] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Historial de prácticas y práctica activa
-  const [historial, setHistorial] = useState<CasoPractico[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_HISTORIAL_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-    return CASOS_PREDEFINIDOS;
-  });
-
-  const [practicaActualId, setPracticaActualId] = useState<string>(
-    () => CASOS_PREDEFINIDOS[0].id
+  // Casos propios (generados o importados); los 3 oficiales van aparte y
+  // siempre están disponibles aunque se borre o llene el historial.
+  const [casosPropios, setCasosPropios] = useState<CasoPractico[]>(() =>
+    cargarCasosPropios()
   );
+
+  const [practicaActualId, setPracticaActualId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_CASO_ACTIVO_KEY) || CASOS_PREDEFINIDOS[0].id;
+    } catch {
+      return CASOS_PREDEFINIDOS[0].id;
+    }
+  });
 
   // Progreso de checkboxes por práctica
   const [completadosPorPractica, setCompletadosPorPractica] = useState<
@@ -761,21 +320,39 @@ export default function App() {
     return `${String(min).padStart(2, '0')}:${String(seg).padStart(2, '0')}`;
   };
 
+  const historial = useMemo(
+    () => [...casosPropios, ...CASOS_PREDEFINIDOS],
+    [casosPropios]
+  );
+
   const practicaActual = useMemo(() => {
     return (
       historial.find((item) => item.id === practicaActualId) ||
-      historial[0] ||
       CASOS_PREDEFINIDOS[0]
     );
   }, [historial, practicaActualId]);
 
+  const esCasoPropio = !practicaActual.id.startsWith('preset-');
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_HISTORIAL_KEY, JSON.stringify(historial));
+      localStorage.setItem(STORAGE_HISTORIAL_KEY, JSON.stringify(casosPropios));
+    } catch {
+      mostrarNotificacion(
+        'error',
+        'El navegador no permite guardar más casos. Exporta los que quieras conservar y elimina alguno.'
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casosPropios]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_CASO_ACTIVO_KEY, practicaActualId);
     } catch {
       // Ignore
     }
-  }, [historial]);
+  }, [practicaActualId]);
 
   useEffect(() => {
     try {
@@ -816,16 +393,12 @@ export default function App() {
     }
   };
 
-  // 3. INTEGRACIÓN CON LA API DE GEMINI (CLIENT-SIDE FETCH DIRECTO CON BYOK)
+  // 3. INTEGRACIÓN CON LA API DE GEMINI (fetch directo con la clave del usuario)
   const handleGenerarPractica = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isGenerating) return;
 
-    const currentKey = (
-      localStorage.getItem(API_KEY_STORAGE) ||
-      apiKey ||
-      ''
-    ).trim();
-
+    const currentKey = apiKey.trim();
     if (!currentKey) {
       mostrarNotificacion(
         'error',
@@ -836,113 +409,25 @@ export default function App() {
     }
 
     setIsGenerating(true);
-
-    const modulosTexto =
-      modulos.length > 0
-        ? modulos.join(', ')
-        : 'Formato general acorde al nivel seleccionado';
-
-    const prompt = `Actúa como un profesor experto en Ofimática y Certificación MOS de Microsoft Word (versión escritorio en español).
-Genera un caso práctico completo, riguroso y realista para un estudiante de ofimática con estos parámetros:
-- Nivel de dificultad: ${nivel}
-- Tipo de documento / Escenario: ${escenario}
-- Módulos opcionales obligatorios a incluir en los requisitos técnicos: ${modulosTexto}
-${
-  temaPersonalizado.trim()
-    ? `- Temática o sector empresarial: ${temaPersonalizado.trim()}`
-    : ''
-}
-
-Reglas pedagógicas estrictas:
-1. "texto_sin_formato": Entre 4 y 6 párrafos extensos y realistas de texto continuo sin formato (separados por saltos de línea dobles \\n\\n) listos para copiar y pegar en Microsoft Word. Incluye títulos de sección numerados (ej. "1. INTRODUCCIÓN...") y, si se incluyen "Tablas" o "Tabulaciones", añade bloques de datos con guiones (" - ") o puntos (" ... ") para que el alumno los convierta en tabla o aplique paradas de tabulación.
-2. "requisitos_tecnicos": Entre 7 y 10 requisitos detallados con medidas exactas (puntos pt, centímetros cm, alineación, nombres de estilos, saltos) cuya suma total de "puntos" sea exactamente 100.
-3. En cada requisito incluye:
-   - "ruta_cinta_opciones": Ruta exacta en los menús en español de Microsoft Word (ej. "Inicio > Párrafo > Configuración de párrafo > Sangría y espacio").
-   - "atajo_teclado": Atajo de teclado real en Word en español (ej. "Ctrl + J", "Ctrl + M", "Alt + Ctrl + 1", "Ctrl + Entrar").
-   - "error_frecuente": Consejo docente advirtiendo del fallo habitual del estudiante en ese paso.`;
-
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-        currentKey
-      )}`;
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            response_mime_type: 'application/json',
-            response_schema: GEMINI_RESPONSE_SCHEMA,
-            temperature: 0.7,
-          },
-        }),
+      const { caso } = await generarCaso({
+        apiKey: currentKey,
+        parametros: { nivel, escenario, modulos, tema: temaPersonalizado },
       });
-
-      if (response.status === 400 || response.status === 403) {
-        mostrarNotificacion(
-          'error',
-          `Error ${response.status}: Tu API Key de Gemini es inválida, no tiene permisos o ha expirado. Por favor, revísala o introduce una nueva.`
-        );
-        setModalKeyAbierto(true);
-        setIsGenerating(false);
-        return;
-      }
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(
-          errData?.error?.message ||
-            `Error HTTP ${response.status} al llamar a Gemini API.`
-        );
-      }
-
-      const result = await response.json();
-      const rawJsonText =
-        result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      if (!rawJsonText) {
-        throw new Error('La respuesta de Gemini no incluyó contenido JSON.');
-      }
-
-      const data = JSON.parse(rawJsonText.trim());
-
-      const nuevaPractica: CasoPractico = {
-        id: `custom-${Date.now()}`,
-        fecha_creacion: new Date().toLocaleTimeString('es-ES', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        nivel,
-        escenario,
-        modulos: [...modulos],
-        tiempo_estimado_min: data.tiempo_estimado_min || 30,
-        titulo_practica: data.titulo_practica,
-        escenario_laboral: data.escenario_laboral,
-        texto_sin_formato: data.texto_sin_formato,
-        requisitos_tecnicos: Array.isArray(data.requisitos_tecnicos)
-          ? data.requisitos_tecnicos
-          : [],
-        criterio_evaluacion_final: data.criterio_evaluacion_final || '',
-      };
-
-      setHistorial((prev) => [nuevaPractica, ...prev.slice(0, 19)]);
-      setPracticaActualId(nuevaPractica.id);
+      setCasosPropios((prev) => [caso, ...prev].slice(0, MAX_CASOS_PROPIOS));
+      setPracticaActualId(caso.id);
       setSegundosCronometro(0);
+      setCronometroActivo(false);
       mostrarNotificacion('exito', '¡Nueva práctica de Word generada con éxito!');
     } catch (err: unknown) {
-      mostrarNotificacion(
-        'error',
+      const mensaje =
         err instanceof Error
           ? err.message
-          : 'Error de red o de formato al generar la práctica.'
-      );
+          : 'Error de red o de formato al generar la práctica.';
+      mostrarNotificacion('error', mensaje, 8000);
+      if (err instanceof ErrorGemini && err.motivo === 'clave') {
+        setModalKeyAbierto(true);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -950,16 +435,20 @@ Reglas pedagógicas estrictas:
 
   // Exportar / Importar Caso en JSON para que el profesor comparta retos con la clase
   const handleExportarJSON = () => {
-    const jsonString = JSON.stringify(practicaActual, null, 2);
+    const { id: _id, fecha_creacion: _fecha, ...exportable } = practicaActual;
+    const jsonString = JSON.stringify(exportable, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `reto_word_${practicaActual.nivel.toLowerCase()}_${Date.now()
-      .toString()
-      .slice(-4)}.json`;
+    a.download = `reto_word_${slugArchivo(practicaActual.nivel)}_${slugArchivo(
+      practicaActual.titulo_practica,
+      40
+    )}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     mostrarNotificacion(
       'exito',
       'Caso práctico exportado en JSON para compartir con tus alumnos.'
@@ -968,38 +457,57 @@ Reglas pedagógicas estrictas:
 
   const handleImportarJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (file.size > MAX_BYTES_IMPORTACION) {
+      mostrarNotificacion('error', 'El archivo es demasiado grande para ser un reto de OfiWord Studio (máx. 1 MB).');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
+      let importada: CasoPractico;
       try {
         const parsed = JSON.parse(String(ev.target?.result || ''));
-        if (
-          !parsed.titulo_practica ||
-          !parsed.texto_sin_formato ||
-          !Array.isArray(parsed.requisitos_tecnicos)
-        ) {
-          throw new Error('Estructura JSON no válida.');
-        }
-        const importada: CasoPractico = {
-          ...parsed,
+        importada = normalizarCaso(parsed, {
           id: `imported-${Date.now()}`,
           fecha_creacion: 'Importado JSON',
-        };
-        setHistorial((prev) => [importada, ...prev]);
-        setPracticaActualId(importada.id);
-        mostrarNotificacion(
-          'exito',
-          `Práctica "${importada.titulo_practica}" cargada correctamente.`
-        );
-      } catch {
+        });
+      } catch (err) {
         mostrarNotificacion(
           'error',
-          'El archivo JSON seleccionado no tiene el formato de una práctica de OfiWord Studio.'
+          err instanceof CasoInvalidoError
+            ? `El archivo no es un reto válido de OfiWord Studio: ${err.message}`
+            : 'El archivo seleccionado no es un JSON válido.'
         );
+        return;
       }
+      setCasosPropios((prev) => [importada, ...prev].slice(0, MAX_CASOS_PROPIOS));
+      setPracticaActualId(importada.id);
+      setSegundosCronometro(0);
+      setCronometroActivo(false);
+      mostrarNotificacion(
+        'exito',
+        `Práctica "${importada.titulo_practica}" cargada correctamente.`
+      );
     };
+    reader.onerror = () =>
+      mostrarNotificacion('error', 'No se pudo leer el archivo seleccionado.');
     reader.readAsText(file);
-    e.target.value = '';
+  };
+
+  const handleEliminarCasoActual = () => {
+    if (!esCasoPropio) return;
+    if (!window.confirm(`¿Eliminar «${practicaActual.titulo_practica}» de este navegador?`)) {
+      return;
+    }
+    const idEliminado = practicaActual.id;
+    setCasosPropios((prev) => prev.filter((c) => c.id !== idEliminado));
+    setCompletadosPorPractica((prev) => {
+      const { [idEliminado]: _borrado, ...resto } = prev;
+      return resto;
+    });
+    setPracticaActualId(CASOS_PREDEFINIDOS[0].id);
+    mostrarNotificacion('exito', 'Caso eliminado de este navegador.');
   };
 
   const estadoCompletadosActual = useMemo(() => {
@@ -1516,11 +1024,8 @@ Reglas pedagógicas estrictas:
         );
       }
 
-      const slugAlumno = (nombreAlumno.trim() || 'estudiante')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/gi, '_')
-        .slice(0, 25);
-      const slugPractica = practicaActual.nivel.toLowerCase();
+      const slugAlumno = slugArchivo(nombreAlumno.trim() || 'estudiante');
+      const slugPractica = slugArchivo(practicaActual.nivel);
 
       doc.save(`calificacion_word_${slugAlumno}_${slugPractica}.pdf`);
       mostrarNotificacion(
@@ -1538,495 +1043,28 @@ Reglas pedagógicas estrictas:
     }
   };
 
-  // Descargar el archivo único SPA (index.html) 100% autocontenido para subir directamente a GitHub Pages
-  const handleDescargarSingleFileGitHubPages = async () => {
-    const logoDataUri = await obtenerLogoBase64();
-
-    const singleFileHTML = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OfiWord Studio — Un Fantasma en el Sistema</title>
-  <link rel="icon" type="image/png" href="${logoDataUri}" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #F8FAFC;
-      --surface: #FFFFFF;
-      --surface-alt: #F1F5F9;
-      --border: #E2E8F0;
-      --text: #0F172A;
-      --muted: #475569;
-      --accent: #0284C7;
-      --accent-hover: #0369A1;
-      --success: #059669;
-      --success-bg: #ECFDF5;
-      --danger: #DC2626;
-      --radius: 10px;
-      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      --font-mono: 'IBM Plex Mono', monospace;
+  // La build publicada incluye `ofiword-studio.html`: la aplicación completa en
+  // un único archivo (código, estilos, fuentes y logo) para usarla sin servidor.
+  const handleDescargarVersionOffline = async () => {
+    try {
+      const res = await fetch(OFFLINE_FILE, { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      mostrarNotificacion(
+        'error',
+        'La versión offline solo está disponible en la web publicada (se genera con npm run build).'
+      );
+      return;
     }
-    body.dark {
-      --bg: #0F172A;
-      --surface: #1E293B;
-      --surface-alt: #090E1A;
-      --border: #334155;
-      --text: #F8FAFC;
-      --muted: #94A3B8;
-      --success-bg: rgba(5, 150, 105, 0.15);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: var(--font-sans);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.55;
-      transition: background 0.15s, color 0.15s;
-    }
-    .topbar {
-      position: sticky; top: 0; z-index: 20;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0.75rem 1.5rem;
-      display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-    }
-    .brand-wrap {
-      display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: var(--text);
-    }
-    .brand-logo {
-      height: 42px; width: auto; object-fit: contain; flex-shrink: 0; display: block;
-    }
-    .brand-title { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.02em; }
-    .brand-sub { font-size: 0.75rem; color: var(--accent); font-weight: 600; display: block; }
-    .top-actions { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
-    .container { max-width: 1380px; margin: 0 auto; padding: 1.5rem; }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.35rem;
-      margin-bottom: 1.25rem;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.25rem;
-      align-items: end;
-    }
-    label.field-label {
-      display: block; font-size: 0.78rem; font-weight: 600; margin-bottom: 0.45rem;
-    }
-    select, input[type="text"], input[type="password"], textarea {
-      width: 100%;
-      padding: 0.6rem 0.8rem;
-      border-radius: 7px;
-      border: 1px solid var(--border);
-      background: var(--surface-alt);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.875rem;
-    }
-    .modules-wrap { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .mod-chip {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.4rem 0.7rem; border: 1px solid var(--border);
-      border-radius: 6px; font-size: 0.8rem; cursor: pointer; user-select: none;
-      background: var(--surface-alt);
-    }
-    .mod-chip input { margin: 0; accent-color: var(--accent); }
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
-      padding: 0.6rem 1.1rem; border-radius: 7px; font-weight: 600; font-size: 0.82rem;
-      border: 1px solid transparent; cursor: pointer; font-family: inherit; white-space: nowrap;
-      text-decoration: none;
-    }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-primary:disabled { opacity: 0.6; cursor: wait; }
-    .btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
-    .btn-outline:hover { background: var(--surface-alt); }
-    .btn-danger { background: var(--danger); color: #fff; }
-    .workspace {
-      display: grid;
-      grid-template-columns: 5fr 7fr;
-      gap: 1.5rem;
-      align-items: start;
-    }
-    @media (max-width: 980px) { .workspace { grid-template-columns: 1fr; } }
-    .meta-line { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; }
-    .scenario-box {
-      background: var(--surface-alt); border: 1px solid var(--border);
-      border-radius: 8px; padding: 0.9rem 1rem; font-size: 0.88rem; margin: 0.85rem 0 1.1rem;
-    }
-    textarea.raw-text {
-      font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
-      height: 390px; resize: vertical; margin-top: 0.5rem;
-    }
-    .progress-box {
-      background: var(--surface-alt); border: 1px solid var(--border);
-      border-radius: 8px; padding: 0.9rem 1rem; margin: 0.85rem 0 1.1rem;
-    }
-    .progress-track {
-      width: 100%; height: 9px; background: var(--border);
-      border-radius: 99px; overflow: hidden; margin-top: 0.5rem;
-    }
-    .progress-bar {
-      height: 100%; background: var(--accent); width: 0%; transition: width 0.2s ease;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th, td { border-bottom: 1px solid var(--border); padding: 0.75rem 0.6rem; text-align: left; vertical-align: top; }
-    th { font-size: 0.75rem; color: var(--muted); background: var(--surface-alt); }
-    tr.completed td { background: var(--success-bg); }
-    tr.completed .req-desc { text-decoration: line-through; opacity: 0.7; }
-    .ribbon-code {
-      font-family: var(--font-mono); font-size: 0.74rem; color: var(--accent);
-      background: var(--surface-alt); padding: 0.25rem 0.45rem; border-radius: 4px;
-      border: 1px solid var(--border); display: inline-block;
-    }
-    .exam-mode .col-ribbon { display: none; }
-    .pts-col { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; white-space: nowrap; }
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75);
-      display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem;
-      backdrop-filter: blur(3px);
-    }
-    .modal-backdrop.active { display: flex; }
-    .modal {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; max-width: 480px; width: 100%; padding: 1.5rem;
-    }
-    .toast {
-      position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60;
-      padding: 0.85rem 1.15rem; border-radius: 8px; font-size: 0.84rem; font-weight: 500;
-      border: 1px solid var(--border); background: var(--surface); color: var(--text);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none; max-width: 420px;
-    }
-    .toast.active { display: block; }
-    .footer {
-      border-top: 1px solid var(--border); padding: 1.5rem; margin-top: 2rem;
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-      font-size: 0.82rem; color: var(--muted); max-width: 1380px; margin-left: auto; margin-right: auto;
-    }
-    .spinner {
-      display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
-      border-radius: 50%; animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <header class="topbar">
-    <a href="${AUTHOR_WEB_URL}" target="_blank" rel="noopener noreferrer" class="brand-wrap">
-      <img src="${logoDataUri}" alt="Logo Un Fantasma en el Sistema" class="brand-logo" />
-      <div>
-        <span class="brand-title">OfiWord Studio · Prácticas de Microsoft Word</span>
-        <span class="brand-sub">unfantasmaenelsistema.com</span>
-      </div>
-    </a>
-    <div class="top-actions">
-      <a href="${AUTHOR_WEB_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-outline">Visitar Web</a>
-      <button type="button" class="btn btn-outline" id="btn-theme">Tema Claro / Oscuro</button>
-      <button type="button" class="btn btn-outline" id="btn-manage-key">Cambiar / Borrar API Key</button>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="card">
-      <form id="form-generator">
-        <div class="form-grid">
-          <div>
-            <label class="field-label" for="sel-nivel">1. Nivel de Competencia</label>
-            <select id="sel-nivel">
-              <option value="Iniciación">Iniciación (fuentes, alineación, interlineado, sangrías, viñetas)</option>
-              <option value="Intermedio" selected>Intermedio (tablas complejas, tabulaciones con relleno, columnas, saltos)</option>
-              <option value="Avanzado">Avanzado (estilos jerárquicos, TOC automática, encabezados desvinculados)</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label" for="sel-escenario">2. Escenario / Tipo de Documento</label>
-            <select id="sel-escenario">
-              <option value="Circular interna corporativa">Circular interna corporativa</option>
-              <option value="Informe técnico" selected>Informe técnico</option>
-              <option value="Manual de procedimientos">Manual de procedimientos</option>
-              <option value="Carta formal comercial">Carta formal comercial</option>
-              <option value="Acta de reunión ejecutiva">Acta de reunión ejecutiva</option>
-              <option value="Pliego de prescripciones técnicas">Pliego de prescripciones técnicas</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">3. Módulos Opcionales a Incluir</label>
-            <div class="modules-wrap" id="modulos-container">
-              <label class="mod-chip"><input type="checkbox" value="Tablas" checked /> Tablas</label>
-              <label class="mod-chip"><input type="checkbox" value="Estilos" checked /> Estilos</label>
-              <label class="mod-chip"><input type="checkbox" value="Tabulaciones" checked /> Tabulaciones</label>
-              <label class="mod-chip"><input type="checkbox" value="Columnas" checked /> Columnas</label>
-              <label class="mod-chip"><input type="checkbox" value="Portada" /> Portada</label>
-              <label class="mod-chip"><input type="checkbox" value="Encabezados y Pies" /> Encabezados</label>
-              <label class="mod-chip"><input type="checkbox" value="Tabla de Contenido" /> Índice TOC</label>
-            </div>
-          </div>
-          <div>
-            <button type="submit" class="btn btn-primary" id="btn-generate" style="width:100%;">
-              Generar Práctica
-            </button>
-          </div>
-        </div>
-      </form>
-    </section>
-
-    <div class="workspace">
-      <section class="card">
-        <div class="meta-line" id="practice-meta">Nivel Intermedio · Informe técnico</div>
-        <h2 id="practice-title" style="margin:0 0 0.5rem 0; font-size:1.25rem;"></h2>
-        <div class="scenario-box">
-          <strong>Contexto del encargo laboral:</strong>
-          <p id="practice-scenario" style="margin:0.35rem 0 0 0;"></p>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-          <label class="field-label" for="raw-text" style="margin:0;">Texto sin formato (Pegar en Word)</label>
-          <button type="button" class="btn btn-primary" id="btn-copy">Copiar texto al portapapeles</button>
-        </div>
-        <textarea id="raw-text" class="raw-text" readonly></textarea>
-      </section>
-
-      <section class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-          <h2 style="margin:0; font-size:1.15rem;">Hoja de Instrucciones y Rúbrica</h2>
-          <button type="button" class="btn btn-outline" id="btn-toggle-mode">Modo: Práctica Guiada</button>
-        </div>
-        <div class="progress-box">
-          <div style="display:flex; justify-content:space-between; font-size:0.84rem; font-weight:600;">
-            <span>Progreso acumulado</span>
-            <span id="score-readout" class="pts-col">0 / 100 pts (0%)</span>
-          </div>
-          <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
-        </div>
-        <div style="overflow-x:auto;">
-          <table id="rubric-table">
-            <thead>
-              <tr>
-                <th style="width:42px;">Hecho</th>
-                <th>Categoría y Acción Requerida</th>
-                <th class="col-ribbon">Ruta Cinta de Opciones / Atajo</th>
-                <th class="pts-col">Puntos</th>
-              </tr>
-            </thead>
-            <tbody id="rubric-body"></tbody>
-          </table>
-        </div>
-        <p style="margin-top:1rem; font-size:0.82rem; color:var(--muted);">
-          <strong>Criterio de evaluación final:</strong> <span id="practice-criteria"></span>
-        </p>
-      </section>
-    </div>
-  </main>
-
-  <footer class="footer">
-    <div style="display:flex; align-items:center; gap:0.65rem;">
-      <img src="${logoDataUri}" alt="Logo Un Fantasma en el Sistema" style="height:32px; width:auto; object-fit:contain;" />
-      <span>Creado por <a href="${AUTHOR_WEB_URL}" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-weight:600; text-decoration:none;">Un Fantasma en el Sistema</a></span>
-    </div>
-    <a href="${AUTHOR_WEB_URL}" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-weight:600;">${AUTHOR_WEB_URL}</a>
-  </footer>
-
-  <div class="modal-backdrop" id="key-modal">
-    <div class="modal">
-      <h3 style="margin:0 0 0.5rem 0;">Configurar Google Gemini API Key (BYOK)</h3>
-      <p style="font-size:0.85rem; color:var(--muted); margin:0 0 0.85rem 0;">
-        Esta aplicación se ejecuta 100% en tu navegador. Tu clave se almacena únicamente en <code>localStorage</code> de este dispositivo.
-      </p>
-      <p style="font-size:0.84rem; margin:0 0 1rem 0;">
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-weight:600;">
-          Obtén tu API Key gratuita en https://aistudio.google.com/app/apikey
-        </a>
-      </p>
-      <form id="form-key">
-        <label class="field-label" for="input-api-key">Tu Gemini API Key</label>
-        <input type="password" id="input-api-key" placeholder="AIzaSy..." required />
-        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.1rem; flex-wrap:wrap;">
-          <button type="button" class="btn btn-danger" id="btn-clear-key">Borrar Clave</button>
-          <button type="button" class="btn btn-outline" id="btn-close-modal">Cerrar</button>
-          <button type="submit" class="btn btn-primary">Guardar Clave</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script>
-    const INITIAL_PRACTICE = ${JSON.stringify(practicaActual)};
-    const SCHEMA = ${JSON.stringify(GEMINI_RESPONSE_SCHEMA)};
-    let currentPractice = INITIAL_PRACTICE;
-    let checkedMap = {};
-    let examMode = false;
-
-    const modal = document.getElementById('key-modal');
-    const inputKey = document.getElementById('input-api-key');
-    const toastEl = document.getElementById('toast');
-
-    function showToast(msg) {
-      toastEl.textContent = msg;
-      toastEl.classList.add('active');
-      setTimeout(() => toastEl.classList.remove('active'), 4500);
-    }
-
-    function checkStoredKey() {
-      const k = localStorage.getItem('gemini_api_key');
-      if (!k) {
-        modal.classList.add('active');
-      } else {
-        inputKey.value = k;
-      }
-    }
-
-    document.getElementById('btn-manage-key').onclick = () => {
-      inputKey.value = localStorage.getItem('gemini_api_key') || '';
-      modal.classList.add('active');
-    };
-    document.getElementById('btn-close-modal').onclick = () => modal.classList.remove('active');
-    document.getElementById('btn-clear-key').onclick = () => {
-      localStorage.removeItem('gemini_api_key');
-      inputKey.value = '';
-      showToast('Clave borrada de localStorage.');
-    };
-    document.getElementById('form-key').onsubmit = (e) => {
-      e.preventDefault();
-      const val = inputKey.value.trim();
-      if (!val) return;
-      localStorage.setItem('gemini_api_key', val);
-      modal.classList.remove('active');
-      showToast('API Key guardada en tu navegador.');
-    };
-
-    document.getElementById('btn-theme').onclick = () => document.body.classList.toggle('dark');
-
-    document.getElementById('btn-toggle-mode').onclick = (e) => {
-      examMode = !examMode;
-      document.getElementById('rubric-table').classList.toggle('exam-mode', examMode);
-      e.target.textContent = examMode ? 'Modo: Examen (Sin Ayudas)' : 'Modo: Práctica Guiada';
-    };
-
-    document.getElementById('btn-copy').onclick = async (e) => {
-      await navigator.clipboard.writeText(currentPractice.texto_sin_formato);
-      const btn = e.currentTarget;
-      btn.textContent = '¡Copiado!';
-      setTimeout(() => btn.textContent = 'Copiar texto al portapapeles', 2000);
-    };
-
-    function renderPractice() {
-      document.getElementById('practice-title').textContent = currentPractice.titulo_practica;
-      document.getElementById('practice-scenario').textContent = currentPractice.escenario_laboral;
-      document.getElementById('raw-text').value = currentPractice.texto_sin_formato;
-      document.getElementById('practice-criteria').textContent = currentPractice.criterio_evaluacion_final;
-
-      const tbody = document.getElementById('rubric-body');
-      tbody.innerHTML = '';
-      let earned = 0, total = 0;
-
-      currentPractice.requisitos_tecnicos.forEach((req, idx) => {
-        const pts = Number(req.puntos) || 0;
-        total += pts;
-        if (checkedMap[idx]) earned += pts;
-
-        const tr = document.createElement('tr');
-        if (checkedMap[idx]) tr.classList.add('completed');
-        tr.innerHTML = \`
-          <td><input type="checkbox" \${checkedMap[idx] ? 'checked' : ''} data-idx="\${idx}" /></td>
-          <td>
-            <strong>\${req.categoria}</strong>
-            <div class="req-desc" style="margin-top:0.2rem;">\${req.accion_requerida}</div>
-            \${req.error_frecuente && !examMode ? '<div style="margin-top:0.35rem; font-size:0.75rem; color:var(--muted);">Evita: ' + req.error_frecuente + '</div>' : ''}
-          </td>
-          <td class="col-ribbon">
-            <span class="ribbon-code">\${req.ruta_cinta_opciones}</span>
-            \${req.atajo_teclado ? '<div style="margin-top:0.25rem; font-size:0.72rem; font-family:var(--font-mono);">Atajo: ' + req.atajo_teclado + '</div>' : ''}
-          </td>
-          <td class="pts-col">+\${pts}</td>
-        \`;
-        tr.querySelector('input').onchange = (ev) => {
-          checkedMap[idx] = ev.target.checked;
-          renderPractice();
-        };
-        tbody.appendChild(tr);
-      });
-
-      const pct = total > 0 ? Math.round((earned / total) * 100) : 0;
-      document.getElementById('score-readout').textContent = \`\${earned} / \${total} pts (\${pct}%)\`;
-      document.getElementById('progress-bar').style.width = pct + '%';
-    }
-
-    document.getElementById('form-generator').onsubmit = async (e) => {
-      e.preventDefault();
-      const apiKey = localStorage.getItem('gemini_api_key');
-      if (!apiKey) {
-        showToast('Introduce tu Gemini API Key primero.');
-        modal.classList.add('active');
-        return;
-      }
-      const nivel = document.getElementById('sel-nivel').value;
-      const escenario = document.getElementById('sel-escenario').value;
-      const modulos = Array.from(document.querySelectorAll('#modulos-container input:checked')).map(i => i.value);
-
-      const btn = document.getElementById('btn-generate');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Generando...';
-
-      try {
-        const res = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\${encodeURIComponent(apiKey)}\`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: \`Genera un caso práctico de Microsoft Word en español. Nivel: \${nivel}. Escenario: \${escenario}. Módulos obligatorios: \${modulos.join(', ')}. Incluye de 4 a 5 párrafos extensos en texto_sin_formato y requisitos_tecnicos con atajo_teclado y error_frecuente que sumen 100 puntos.\` }] }],
-            generationConfig: { response_mime_type: 'application/json', response_schema: SCHEMA }
-          })
-        });
-
-        if (res.status === 400 || res.status === 403) {
-          showToast('Error ' + res.status + ': API Key inválida o expirada. Actualízala.');
-          modal.classList.add('active');
-          return;
-        }
-        const json = await res.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          currentPractice = JSON.parse(text);
-          checkedMap = {};
-          document.getElementById('practice-meta').textContent = \`Nivel \${nivel} · \${escenario}\`;
-          renderPractice();
-          showToast('¡Práctica generada correctamente!');
-        }
-      } catch (err) {
-        showToast('Error al conectar con Gemini API.');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Generar Práctica';
-      }
-    };
-
-    checkStoredKey();
-    renderPractice();
-  </script>
-</body>
-</html>`;
-
-    const blob = new Blob([singleFileHTML], {
-      type: 'text/html;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'index.html';
+    a.href = OFFLINE_FILE;
+    a.download = OFFLINE_FILE;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
     mostrarNotificacion(
       'exito',
-      'Archivo único "index.html" (con tu logo incrustado) descargado para GitHub Pages.'
+      'Descargada la aplicación completa en un solo archivo HTML: ábrela con doble clic, sin instalar nada.'
     );
   };
 
@@ -2045,72 +1083,11 @@ Reglas pedagógicas estrictas:
     return { palabras, caracteres, sinEspacios, parrafos };
   }, [practicaActual.texto_sin_formato]);
 
-  // Procesador de bloques para el Simulador Visual A4 de Maqueta Objetivo
-  const bloquesSimuladosA4 = useMemo(() => {
-    const bloques = practicaActual.texto_sin_formato
-      .split(/\n\s*\n/)
-      .map((b) => b.trim())
-      .filter(Boolean);
-
-    return bloques.map((bloque, idx) => {
-      const lineas = bloque.split('\n').map((l) => l.trim()).filter(Boolean);
-
-      // Detectar si contiene líneas de tabla (con " - ")
-      const lineasConGuion = lineas.filter((l) => l.includes(' - '));
-      if (lineasConGuion.length >= 2) {
-        const encabezadoSeccion =
-          !lineas[0].includes(' - ') ? lineas[0] : null;
-        const filasTabla = (encabezadoSeccion ? lineas.slice(1) : lineas).map(
-          (l) => l.split(' - ').map((c) => c.trim())
-        );
-        return {
-          tipo: 'tabla' as const,
-          id: idx,
-          tituloSeccion: encabezadoSeccion,
-          filas: filasTabla,
-        };
-      }
-
-      // Detectar si contiene líneas de tabulación con relleno (" ... ")
-      const lineasTabuladas = lineas.filter((l) => l.includes('...'));
-      if (lineasTabuladas.length >= 2) {
-        const encabezadoSeccion = !lineas[0].includes('...') ? lineas[0] : null;
-        const filasTab = (encabezadoSeccion ? lineas.slice(1) : lineas).map(
-          (l) => l.split('...').map((c) => c.trim())
-        );
-        return {
-          tipo: 'tabulaciones' as const,
-          id: idx,
-          tituloSeccion: encabezadoSeccion,
-          filas: filasTab,
-        };
-      }
-
-      // Detectar si es el título principal del documento (primer bloque en mayúsculas)
-      if (idx === 0 && bloque === bloque.toUpperCase()) {
-        return {
-          tipo: 'titulo_principal' as const,
-          id: idx,
-          lineas,
-        };
-      }
-
-      // Párrafo con o sin epígrafe inicial
-      const primeraLineaEsTitulo =
-        lineas.length > 1 &&
-        (lineas[0] === lineas[0].toUpperCase() ||
-          /^\d+(\.\d+)?\s/.test(lineas[0]));
-
-      return {
-        tipo: 'parrafo' as const,
-        id: idx,
-        epigrafe: primeraLineaEsTitulo ? lineas[0] : null,
-        cuerpo: primeraLineaEsTitulo ? lineas.slice(1).join(' ') : lineas.join(' '),
-        enDosColumnas:
-          practicaActual.modulos.includes('Columnas') && idx === 2,
-      };
-    });
-  }, [practicaActual.texto_sin_formato, practicaActual.modulos]);
+  // Bloques para el simulador visual A4 de la maqueta objetivo
+  const bloquesSimuladosA4 = useMemo(
+    () => construirMaqueta(practicaActual),
+    [practicaActual]
+  );
 
   // Cálculo de progreso y puntos
   const {
@@ -2206,7 +1183,7 @@ Reglas pedagógicas estrictas:
     >
       {/* Top Bar con Logo sin distorsionar y enlace a https://www.unfantasmaenelsistema.com/ */}
       <header
-        className={`sticky top-0 z-30 flex items-center justify-between gap-8 px-6 py-3 border-b transition-colors ${
+        className={`sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b transition-colors ${
           darkMode
             ? 'bg-[#0F172A]/95 border-[#1E293B]'
             : 'bg-white/95 border-[#E2E8F0]'
@@ -2231,7 +1208,7 @@ Reglas pedagógicas estrictas:
         </a>
 
         {/* Zone 2: Navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+        <nav className="hidden xl:flex items-center gap-6 text-sm font-medium">
           <a
             href="#configurador"
             onClick={() => setMostrarConfigurador(true)}
@@ -2302,7 +1279,9 @@ Reglas pedagógicas estrictas:
             }`}
           >
             <KeyRound className="w-3.5 h-3.5 shrink-0" />
-            <span>Cambiar / Borrar API Key</span>
+            <span className="hidden sm:inline">
+              {apiKey ? 'Cambiar / Borrar API Key' : 'Configurar API Key'}
+            </span>
           </button>
         </div>
       </header>
@@ -2633,18 +1612,13 @@ Reglas pedagógicas estrictas:
             </div>
 
             <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer ${
-                  darkMode
-                    ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                    : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+              <p
+                className={`text-[11px] ${
+                  darkMode ? 'text-slate-400' : 'text-slate-500'
                 }`}
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir vista</span>
-              </button>
+                Los datos solo se usan para el PDF y se quedan en este navegador.
+              </p>
 
               <div className="flex items-center gap-2 ml-auto">
                 <button
@@ -2733,9 +1707,10 @@ Reglas pedagógicas estrictas:
               servidor intermedio (ideal para GitHub Pages), introduce tu clave
               gratuita de Google Gemini. La clave se guarda únicamente en{' '}
               <code className="font-mono px-1 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800">
-                localStorage.getItem(&apos;gemini_api_key&apos;)
+                localStorage
               </code>{' '}
-              dentro de tu propio navegador.
+              de este navegador y solo se envía a Google al generar. En un
+              ordenador compartido del aula, bórrala al terminar.
             </p>
 
             {/* Enlace directo requerido */}
@@ -2962,22 +1937,38 @@ Reglas pedagógicas estrictas:
                 type="file"
                 accept=".json,application/json"
                 onChange={handleImportarJSON}
-                className="hidden"
+                className="sr-only"
               />
             </label>
 
+            {esCasoPropio && (
+              <button
+                type="button"
+                onClick={handleEliminarCasoActual}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  darkMode
+                    ? 'border-red-900/70 bg-red-950/30 text-red-300 hover:bg-red-950/50'
+                    : 'border-red-200 bg-white text-red-700 hover:bg-red-50'
+                }`}
+                title="Elimina de este navegador el caso que estás viendo"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar caso</span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleDescargarSingleFileGitHubPages}
+              onClick={handleDescargarVersionOffline}
               className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 darkMode
                   ? 'border-[#1E293B] bg-[#1E293B]/60 text-slate-200 hover:bg-[#1E293B]'
                   : 'border-[#E2E8F0] bg-white text-slate-700 hover:bg-slate-50'
               }`}
-              title="Descarga toda la aplicación con tu logo incrustado en un único archivo index.html para GitHub Pages"
+              title="Descarga la aplicación completa en un único archivo HTML que funciona con doble clic"
             >
               <Code2 className="w-3.5 h-3.5 text-[#0284C7]" />
-              <span>Descargar SPA (1 HTML)</span>
+              <span>Versión offline (1 HTML)</span>
             </button>
 
             <button
@@ -3161,7 +2152,7 @@ Reglas pedagógicas estrictas:
                       <Sparkles className="w-4 h-4 shrink-0" />
                       <span>
                         {isGenerating
-                          ? 'Generando práctica con Gemini 2.5 Flash...'
+                          ? 'Generando práctica con Gemini (puede tardar un minuto)...'
                           : 'Generar Práctica'}
                       </span>
                     </button>
@@ -3461,7 +2452,7 @@ Reglas pedagógicas estrictas:
                         if (b.tipo === 'tabla') {
                           return (
                             <div key={b.id} className="space-y-1.5 pt-1">
-                              {mostrarMarcasFormato && (
+                              {mostrarMarcasFormato && b.saltoPaginaAntes && (
                                 <div className="text-[10px] font-mono text-sky-600 text-center border-y border-dashed border-sky-300 py-0.5">
                                   ······ Salto de página (Ctrl + Entrar) ······ ¶
                                 </div>
@@ -3597,8 +2588,8 @@ Reglas pedagógicas estrictas:
 
                       {/* Pie de página simulado */}
                       <div className="border-t border-slate-200 pt-2 mt-4 flex justify-between text-[10px] text-slate-500 font-mono">
-                        <span>{practicaActual.titulo_practica.slice(0, 42)}...</span>
-                        <span>Página 1 de 2</span>
+                        <span className="truncate">{practicaActual.titulo_practica}</span>
+                        <span className="shrink-0">Página X de Y</span>
                       </div>
                     </div>
                   </div>
@@ -4167,13 +3158,23 @@ Reglas pedagógicas estrictas:
               <ExternalLink className="w-3.5 h-3.5 shrink-0" />
             </a>
             <span aria-hidden="true">·</span>
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-semibold hover:underline"
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Código abierto (MIT)</span>
+            </a>
+            <span aria-hidden="true">·</span>
             <button
               type="button"
-              onClick={handleDescargarSingleFileGitHubPages}
+              onClick={handleDescargarVersionOffline}
               className="inline-flex items-center gap-1 font-semibold hover:underline cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Descargar index.html único para GitHub Pages</span>
+              <span>Descargar versión offline</span>
             </button>
           </div>
         </div>
