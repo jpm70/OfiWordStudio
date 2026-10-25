@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="106%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.05"/>
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1200" height="720" fill="url(#bgGrad)"/>
+
+  <!-- Top Navigation Bar -->
+  <rect width="1200" height="56" fill="#FFFFFF"/>
+  <line x1="0" y1="56" x2="1200" y2="56" stroke="#E2E8F0" stroke-width="1"/>
+  <circle cx="38" cy="28" r="14" fill="#0F172A"/>
+  <circle cx="35" cy="26" r="3" fill="#FFFFFF"/>
+  <circle cx="43" cy="26" r="2.5" fill="#FFFFFF"/>
+  <text x="62" y="34" font-size="16" font-weight="700" fill="#0F172A">OfiWord Studio</text>
+
+  <text x="380" y="33" font-size="13" font-weight="500" fill="#475569">Configurador</text>
+  <text x="485" y="33" font-size="13" font-weight="500" fill="#475569">Material y Maqueta A4</text>
+  <text x="645" y="33" font-size="13" font-weight="500" fill="#475569">Rúbrica</text>
+  <text x="715" y="33" font-size="13" font-weight="500" fill="#475569">Chuleta Word</text>
+  <text x="820" y="33" font-size="13" font-weight="600" fill="#0284C7">Un Fantasma en el Sistema ↗</text>
+
+  <!-- API Key Button -->
+  <rect x="1015" y="13" width="160" height="30" rx="6" fill="#F1F5F9" stroke="#CBD5E1"/>
+  <text x="1095" y="32" font-size="11" font-weight="600" fill="#1E293B" text-anchor="middle">🔑 Cambiar / Borrar API Key</text>
+
+  <!-- Secondary Header -->
+  <text x="32" y="84" font-size="11" font-weight="600" fill="#0284C7">unfantasmaenelsistema.com · Simulador y Evaluador Técnico de Microsoft Word</text>
+  <text x="32" y="108" font-size="20" font-weight="700" fill="#0F172A">Generador de Casos Prácticos y Retos de Ofimática</text>
+
+  <rect x="740" y="80" width="135" height="30" rx="6" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="807" y="99" font-size="11" font-weight="600" fill="#334155" text-anchor="middle">Chuleta y Atajos Word</text>
+  <rect x="885" y="80" width="130" height="30" rx="6" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="950" y="99" font-size="11" font-weight="600" fill="#334155" text-anchor="middle">Exportar Reto (.json)</text>
+  <rect x="1025" y="80" width="145" height="30" rx="6" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="1097" y="99" font-size="11" font-weight="600" fill="#0284C7" text-anchor="middle">Descargar SPA (1 HTML)</text>
+
+  <!-- Configurator Card -->
+  <rect x="30" y="126" width="1140" height="142" rx="10" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#cardShadow)"/>
+  <text x="48" y="150" font-size="11" font-weight="700" fill="#0F172A">01. Selector de Nivel de Competencia</text>
+
+  <!-- Level 1 -->
+  <rect x="48" y="160" width="145" height="90" rx="7" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="60" y="180" font-size="13" font-weight="700" fill="#0F172A">Iniciación</text>
+  <text x="155" y="180" font-size="10" font-family="monospace" fill="#0284C7">~20m</text>
+  <text x="60" y="198" font-size="10" fill="#64748B">Fuentes, alineación,</text>
+  <text x="60" y="212" font-size="10" fill="#64748B">interlineado, sangrías,</text>
+  <text x="60" y="226" font-size="10" fill="#64748B">bordes y viñetas.</text>
+
+  <!-- Level 2 (Active) -->
+  <rect x="202" y="160" width="150" height="90" rx="7" fill="#F0F9FF" stroke="#0284C7" stroke-width="1.5"/>
+  <text x="214" y="180" font-size="13" font-weight="700" fill="#0F172A">Intermedio</text>
+  <text x="312" y="180" font-size="10" font-family="monospace" font-weight="700" fill="#0284C7">~30m</text>
+  <text x="214" y="198" font-size="10" fill="#334155">Tablas complejas,</text>
+  <text x="214" y="212" font-size="10" fill="#334155">tabulaciones con relleno,</text>
+  <text x="214" y="226" font-size="10" fill="#334155">columnas y saltos.</text>
+
+  <!-- Level 3 -->
+  <rect x="361" y="160" width="150" height="90" rx="7" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="373" y="180" font-size="13" font-weight="700" fill="#0F172A">Avanzado</text>
+  <text x="472" y="180" font-size="10" font-family="monospace" fill="#0284C7">~45m</text>
+  <text x="373" y="198" font-size="10" fill="#64748B">Estilos jerárquicos, TOC</text>
+  <text x="373" y="212" font-size="10" fill="#64748B">automática, encabezados</text>
+  <text x="373" y="226" font-size="10" fill="#64748B">desvinculados.</text>
+
+  <!-- Scenario Selector -->
+  <text x="535" y="150" font-size="11" font-weight="700" fill="#0F172A">02. Escenario Documental</text>
+  <rect x="535" y="160" width="250" height="34" rx="6" fill="#FFFFFF" stroke="#CBD5E1"/>
+  <text x="548" y="182" font-size="12" fill="#0F172A">Informe técnico</text>
+  <text x="765" y="182" font-size="11" fill="#64748B">▼</text>
+  <text x="535" y="212" font-size="10" fill="#475569">Sector empresarial o temática (opcional):</text>
+  <rect x="535" y="218" width="250" height="30" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="548" y="237" font-size="11" fill="#94A3B8">Ej. Auditoría energética, Logística...</text>
+
+  <!-- Modules + Generate Button -->
+  <text x="810" y="150" font-size="11" font-weight="700" fill="#0F172A">03. Módulos Técnicos a Evaluar</text>
+  <rect x="810" y="160" width="68" height="26" rx="5" fill="#0284C7"/>
+  <text x="844" y="177" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">✓ Tablas</text>
+  <rect x="884" y="160" width="68" height="26" rx="5" fill="#0284C7"/>
+  <text x="918" y="177" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">✓ Estilos</text>
+  <rect x="958" y="160" width="98" height="26" rx="5" fill="#0284C7"/>
+  <text x="1007" y="177" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">✓ Tabulaciones</text>
+  <rect x="1062" y="160" width="84" height="26" rx="5" fill="#0284C7"/>
+  <text x="1104" y="177" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">✓ Columnas</text>
+
+  <rect x="810" y="212" width="340" height="38" rx="7" fill="#0284C7"/>
+  <text x="980" y="236" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">✨ Generar Práctica</text>
+
+  <!-- Column A: Material de Trabajo -->
+  <rect x="30" y="284" width="465" height="412" rx="10" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#cardShadow)"/>
+  <text x="50" y="310" font-size="11" font-weight="600" fill="#0284C7">Nivel Intermedio · Informe técnico · ~30 min · 295 palabras</text>
+  <text x="50" y="334" font-size="15" font-weight="700" fill="#0F172A">Informe Técnico de Auditoría Energética — Sede Norte</text>
+
+  <rect x="50" y="346" width="425" height="58" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="62" y="364" font-size="11" font-weight="700" fill="#0F172A">Contexto del encargo profesional:</text>
+  <text x="62" y="380" font-size="11" fill="#334155">Trabajas como técnico documental en Grupo Iberia Sostenible S.A.</text>
+  <text x="62" y="394" font-size="11" fill="#334155">Debes maquetar el borrador trimestral de consumo eléctrico y HVAC.</text>
+
+  <!-- Tabs in Column A -->
+  <rect x="50" y="414" width="225" height="30" rx="6" fill="#F1F5F9" stroke="#E2E8F0"/>
+  <rect x="53" y="417" width="102" height="24" rx="4" fill="#FFFFFF"/>
+  <text x="104" y="433" font-size="11" font-weight="700" fill="#0F172A" text-anchor="middle">Texto en Bruto</text>
+  <text x="214" y="433" font-size="11" font-weight="600" fill="#64748B" text-anchor="middle">Maqueta Objetivo A4</text>
+
+  <rect x="315" y="414" width="160" height="30" rx="6" fill="#059669"/>
+  <text x="395" y="433" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">✓ ¡Copiado al portapapeles!</text>
+
+  <!-- Raw Text Box -->
+  <rect x="50" y="454" width="425" height="222" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="64" y="476" font-family="monospace" font-size="10.5" fill="#1E293B">INFORME TÉCNICO DE AUDITORÍA ENERGÉTICA Y CLIMATIZACIÓN</text>
+  <text x="64" y="500" font-family="monospace" font-size="10.5" fill="#334155">1. RESUMEN EJECUTIVO DE LA INTERVENCIÓN</text>
+  <text x="64" y="516" font-family="monospace" font-size="10" fill="#475569">Durante el tercer trimestre del ejercicio actual se ha</text>
+  <text x="64" y="532" font-family="monospace" font-size="10" fill="#475569">llevado a cabo la revisión integral de los sistemas HVAC</text>
+  <text x="64" y="548" font-family="monospace" font-size="10" fill="#475569">y los cuadros de distribución lumínica en cuatro plantas.</text>
+  <text x="64" y="574" font-family="monospace" font-size="10.5" fill="#334155">3. CUADRO DE MEDICIONES Y CONSUMOS (CONVERTIR EN TABLA)</text>
+  <text x="64" y="590" font-family="monospace" font-size="10" fill="#475569">Planta - Superficie (m2) - Consumo (kWh) - Ahorro (%)</text>
+  <text x="64" y="606" font-family="monospace" font-size="10" fill="#475569">Planta Baja (Logística) - 850 - 6420 - 14,5 %</text>
+  <text x="64" y="622" font-family="monospace" font-size="10" fill="#475569">Planta 1 (CPD y Laboratorio) - 620 - 11850 - 22,0 %</text>
+  <text x="64" y="646" font-family="monospace" font-size="10.5" fill="#334155">4. ÍNDICE DE EQUIPOS (TABULACIONES CON RELLENO)</text>
+  <text x="64" y="662" font-family="monospace" font-size="10" fill="#475569">Unidad RoofTop Carrier 40kW ... Ing. Salazar ... OK</text>
+
+  <!-- Column B: Hoja de Instrucciones y Rúbrica -->
+  <rect x="510" y="284" width="660" height="412" rx="10" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#cardShadow)"/>
+  <text x="530" y="310" font-size="11" fill="#64748B">Columna B · Hoja de Instrucciones y Rúbrica · 7 requisitos</text>
+  <text x="530" y="332" font-size="16" font-weight="700" fill="#0F172A">Requisitos Técnicos Evaluables</text>
+
+  <!-- Timer + Mode Toggle -->
+  <rect x="780" y="302" width="102" height="30" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="831" y="321" font-family="monospace" font-size="12" font-weight="700" fill="#0284C7" text-anchor="middle">⏱ 08:42 ▶</text>
+
+  <rect x="890" y="302" width="260" height="30" rx="6" fill="#F1F5F9" stroke="#E2E8F0"/>
+  <rect x="893" y="305" width="142" height="24" rx="4" fill="#FFFFFF"/>
+  <text x="964" y="321" font-size="11" font-weight="700" fill="#0F172A" text-anchor="middle">👁 Modo Práctica Guiada</text>
+  <text x="1092" y="321" font-size="11" font-weight="600" fill="#64748B" text-anchor="middle">Modo Examen</text>
+
+  <!-- Progress Bar Box -->
+  <rect x="530" y="346" width="620" height="62" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="545" y="366" font-size="11" font-weight="700" fill="#0F172A">Calificación en curso:</text>
+  <text x="668" y="366" font-size="11" font-weight="600" fill="#0369A1">Requisitos mínimos superados (Apto)</text>
+  <text x="1135" y="366" font-family="monospace" font-size="14" font-weight="700" fill="#0284C7" text-anchor="end">65 / 100 puntos (65%)</text>
+
+  <rect x="545" y="378" width="590" height="9" rx="4.5" fill="#E2E8F0"/>
+  <rect x="545" y="378" width="383" height="9" rx="4.5" fill="#0284C7"/>
+  <text x="545" y="401" font-family="monospace" font-size="10" fill="#64748B">4 de 7 requisitos completados</text>
+
+  <!-- Rubric Table Header -->
+  <rect x="530" y="418" width="620" height="28" fill="#F1F5F9" stroke="#E2E8F0"/>
+  <text x="540" y="436" font-size="11" font-weight="700" fill="#475569">Hecho</text>
+  <text x="588" y="436" font-size="11" font-weight="700" fill="#475569">Categoría y Acción Requerida</text>
+  <text x="900" y="436" font-size="11" font-weight="700" fill="#475569">Ruta Cinta de Opciones y Atajo</text>
+  <text x="1140" y="436" font-size="11" font-weight="700" fill="#475569" text-anchor="end">Pts</text>
+
+  <!-- Row 1 (Completed) -->
+  <rect x="530" y="446" width="620" height="58" fill="#ECFDF5" stroke="#E2E8F0"/>
+  <rect x="546" y="460" width="15" height="15" rx="3" fill="#0284C7"/>
+  <text x="550" y="472" font-size="11" font-weight="700" fill="#FFFFFF">✓</text>
+  <text x="588" y="464" font-size="11" font-weight="700" fill="#0F172A">01. Diseño de Página</text>
+  <text x="588" y="480" font-size="11" fill="#475569" text-decoration="line-through">Configura papel A4 vertical y márgenes Sup/Inf 2,5 cm; Izq 3,0 cm.</text>
+  <rect x="900" y="454" width="185" height="24" rx="4" fill="#FFFFFF" stroke="#CBD5E1"/>
+  <text x="908" y="470" font-family="monospace" font-size="10" fill="#0369A1">Disposición &gt; Márgenes</text>
+  <text x="1140" y="472" font-family="monospace" font-size="12" font-weight="700" fill="#059669" text-anchor="end">+10</text>
+
+  <!-- Row 2 (Completed) -->
+  <rect x="530" y="504" width="620" height="58" fill="#ECFDF5" stroke="#E2E8F0"/>
+  <rect x="546" y="518" width="15" height="15" rx="3" fill="#0284C7"/>
+  <text x="550" y="530" font-size="11" font-weight="700" fill="#FFFFFF">✓</text>
+  <text x="588" y="522" font-size="11" font-weight="700" fill="#0F172A">02. Estilos</text>
+  <text x="588" y="538" font-size="11" fill="#475569" text-decoration="line-through">Modifica "Título 1" con fuente 14 pt, negrita, espaciado 12 pt / 6 pt.</text>
+  <rect x="900" y="512" width="185" height="24" rx="4" fill="#FFFFFF" stroke="#CBD5E1"/>
+  <text x="908" y="528" font-family="monospace" font-size="10" fill="#0369A1">Inicio &gt; Estilos &gt; Título 1</text>
+  <text x="900" y="550" font-family="monospace" font-size="9.5" fill="#64748B">⌨ Atajo: Alt + Ctrl + 1</text>
+  <text x="1140" y="530" font-family="monospace" font-size="12" font-weight="700" fill="#059669" text-anchor="end">+15</text>
+
+  <!-- Row 3 (Active / Pending) -->
+  <rect x="530" y="562" width="620" height="72" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="546" y="576" width="15" height="15" rx="3" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
+  <text x="588" y="580" font-size="11" font-weight="700" fill="#0F172A">05. Tablas</text>
+  <text x="588" y="596" font-size="11" fill="#1E293B">Convierte los datos del apartado 3 en tabla 5x5 con fila de título.</text>
+  <text x="588" y="616" font-size="10" font-weight="600" fill="#B45309">⚠ Evita este error: No copies celda por celda; usa Convertir texto en tabla.</text>
+  <rect x="900" y="570" width="185" height="24" rx="4" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="908" y="586" font-family="monospace" font-size="10" fill="#0369A1">Insertar &gt; Tabla &gt; Convertir</text>
+  <text x="900" y="608" font-family="monospace" font-size="9.5" fill="#475569">⌨ Atajo: Alt + B, T, V</text>
+  <text x="1140" y="588" font-family="monospace" font-size="12" font-weight="700" fill="#0F172A" text-anchor="end">+20</text>
+</svg>

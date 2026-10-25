@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect width="1200" height="520" fill="#0F172A" fill-opacity="0.92"/>
+
+  <!-- Centered Modal Card -->
+  <rect x="310" y="45" width="580" height="430" rx="14" fill="#FFFFFF" stroke="#CBD5E1"/>
+
+  <!-- Header -->
+  <circle cx="362" cy="95" r="22" fill="#E0F2FE"/>
+  <text x="362" y="102" font-size="20" text-anchor="middle">🔑</text>
+  <text x="398" y="90" font-size="17" font-weight="700" fill="#0F172A">Configuración de Google Gemini API Key (BYOK)</text>
+  <text x="398" y="110" font-size="12" fill="#64748B">Almacenamiento exclusivamente local en tu navegador</text>
+
+  <!-- Description -->
+  <text x="345" y="150" font-size="12" fill="#475569">Para generar nuevos casos prácticos con inteligencia artificial sin servidor</text>
+  <text x="345" y="168" font-size="12" fill="#475569">intermedio (ideal para GitHub Pages), introduce tu clave gratuita de Gemini.</text>
+  <text x="345" y="186" font-size="12" fill="#475569">Se guarda únicamente en <tspan font-family="monospace" fill="#0F172A" font-weight="600">localStorage.getItem('gemini_api_key')</tspan>.</text>
+
+  <!-- Direct Link Box -->
+  <rect x="345" y="206" width="510" height="44" rx="8" fill="#F0F9FF" stroke="#BAE6FD"/>
+  <text x="362" y="233" font-size="12" font-weight="700" fill="#0284C7" text-decoration="underline">Obtén tu API Key gratuita en https://aistudio.google.com/app/apikey ↗</text>
+
+  <!-- Input Field -->
+  <text x="345" y="280" font-size="12" font-weight="700" fill="#0F172A">Tu Google Gemini API Key:</text>
+  <text x="855" y="280" font-size="12" font-weight="600" fill="#0284C7" text-anchor="end">Mostrar clave</text>
+  <rect x="345" y="290" width="510" height="44" rx="8" fill="#F8FAFC" stroke="#0284C7" stroke-width="2"/>
+  <text x="362" y="317" font-family="monospace" font-size="15" fill="#0F172A">•••••••••••••••••••••••••••••••••••••••</text>
+
+  <!-- Buttons -->
+  <text x="345" y="422" font-size="12" font-weight="600" fill="#DC2626">🗑 Borrar clave guardada</text>
+
+  <rect x="640" y="398" width="95" height="38" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+  <text x="687" y="422" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">Cancelar</text>
+
+  <rect x="745" y="398" width="110" height="38" rx="8" fill="#0284C7"/>
+  <text x="800" y="422" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">Guardar Clave</text>
+</svg>
